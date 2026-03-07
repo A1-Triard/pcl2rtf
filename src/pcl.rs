@@ -1,13 +1,16 @@
+#[derive(Debug)]
 pub enum PclParserError {
     FileTooBig,
     UnknownCommand(u32),
     InvalidCommand(u32),
 }
 
+#[derive(Debug)]
 pub enum PclCommand {
     Char(u8),
     LineTermination(u8),
     HorizontalMotionIndex(u16),
+    VerticalMotionIndex(u16),
     ClearHorizontalMargins,
 }
 
@@ -52,13 +55,6 @@ impl<'a> PclParser<'a> {
         Ok((res, t))
     }
 
-    fn parse_amp(&mut self) -> Result<PclCommand, PclParserError> {
-        match self.read_byte()? {
-            b'k' => self.parse_amp_k(),
-            _ => Err(PclParserError::UnknownCommand(self.command_start)),
-        }
-    }
-
     fn parse_amp_k(&mut self) -> Result<PclCommand, PclParserError> {
         let (n, c) = self.read_u16()?;
         match c {
@@ -73,6 +69,22 @@ impl<'a> PclParser<'a> {
         }
     }
     
+    fn parse_amp_l(&mut self) -> Result<PclCommand, PclParserError> {
+        let (n, c) = self.read_u16()?;
+        match c {
+            b'C' => Ok(PclCommand::VerticalMotionIndex(n)),
+            _ => Err(PclParserError::UnknownCommand(self.command_start)),
+        }
+    }
+
+    fn parse_amp(&mut self) -> Result<PclCommand, PclParserError> {
+        match self.read_byte()? {
+            b'k' => self.parse_amp_k(),
+            b'l' => self.parse_amp_l(),
+            _ => Err(PclParserError::UnknownCommand(self.command_start)),
+        }
+    }
+
     fn parse(&mut self) -> Result<PclCommand, PclParserError> {
         match self.read_byte()? {
             b'9' => Ok(PclCommand::ClearHorizontalMargins),
