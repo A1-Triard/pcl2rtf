@@ -1,6 +1,8 @@
 mod pcl;
 use pcl::*;
 
+mod rtf;
+
 use std::io::{Read, stdin};
 
 fn main() {
