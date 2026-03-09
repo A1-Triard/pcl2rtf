@@ -32,7 +32,7 @@ fn main() {
     };
     let res = pcl_to_rtf(&mut commands);
     match res {
-        Err(e) => println!("{e:?}"),
+        Err(e) => eprintln!("{e:?}"),
         Ok(rtf) => print!("{rtf}"),
     }
 }
