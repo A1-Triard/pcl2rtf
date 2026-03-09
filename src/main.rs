@@ -4,6 +4,8 @@ use pcl::*;
 mod rtf;
 use rtf::*;
 
+mod ru;
+
 use std::io::{Read, stdin};
 
 struct Commands<'a> {

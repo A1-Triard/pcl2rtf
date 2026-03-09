@@ -1,6 +1,6 @@
 use crate::pcl::PclCommand;
+use crate::ru::ru_char;
 use either::{Left, Right};
-use oem_cp::Cp866;
 
 #[derive(Debug)]
 pub struct Rtf {
@@ -71,7 +71,7 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
                 let (command, offset) = pcl.next().ok_or(PclToRtfError::UnexpectedEnd)?;
                 match command {
                     PclCommand::Char(c) if c >= b' ' => {
-                        let c = char::from(Cp866(c));
+                        let c = ru_char(c);
                         if new_line {
                             rtf.lines.push(String::new());
                         }
