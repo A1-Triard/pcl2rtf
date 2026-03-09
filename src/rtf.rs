@@ -79,7 +79,7 @@ impl Display for PclToRtfError {
 }
 
 pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf, PclToRtfError> {
-    enum State { PageStart, LineStart, Text, LineEnd }
+    enum State { PageStart, LineStart(bool), Text, LineEnd }
     let mut rtf = Rtf { pages: Vec::new() };
     let mut state = State::PageStart;
     loop {
@@ -101,21 +101,27 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
                             top_margin: u32::try_from(x).unwrap() * 24 / 5,
                             lines: Vec::new(),
                         });
-                        state = State::LineStart;
+                        state = State::LineStart(true);
                     },
                     _ => return Err(PclToRtfError::UnexpectedCommand(offset)),
                 }
             },
-            State::LineStart => {
+            State::LineStart(allow_line_start) => {
                 let (command, offset) = pcl.next().ok_or(PclToRtfError::UnexpectedEnd)?;
                 match command {
                     PclCommand::HorizontalCursorPositioning(Right(x)) if x >= 0 => {
+                        if !allow_line_start {
+                            return Err(PclToRtfError::UnexpectedCommand(offset));
+                        }
                         rtf.pages.last_mut().unwrap().lines.push(Line {
                             indent: u32::try_from(x).unwrap() * 24 / 5,
                             text: String::new(),
                             space_after: 0,
                         });
                         state = State::Text;
+                    },
+                    PclCommand::Char(12) => {
+                        state = State::PageStart;
                     },
                     _ => return Err(PclToRtfError::UnexpectedCommand(offset)),
                 }
@@ -144,10 +150,13 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
             State::LineEnd => {
                 let (command, offset) = pcl.next().ok_or(PclToRtfError::UnexpectedEnd)?;
                 match command {
-                    PclCommand::VerticalCursorPositioning(Right(x)) if x >= 30 => {
-                        let space_after = (u32::try_from(x).unwrap() - 30) * 24 / 5;
+                    PclCommand::VerticalCursorPositioning(Right(x)) if x >= 43 => {
+                        let space_after = (u32::try_from(x).unwrap() - 43) * 26 / 5; // magic & science
                         rtf.pages.last_mut().unwrap().lines.last_mut().unwrap().space_after = space_after;
-                        state = State::LineStart;
+                        state = State::LineStart(true);
+                    },
+                    PclCommand::VerticalCursorPositioning(Right(_)) => {
+                        state = State::LineStart(false);
                     },
                     _ => return Err(PclToRtfError::UnexpectedCommand(offset)),
                 }
