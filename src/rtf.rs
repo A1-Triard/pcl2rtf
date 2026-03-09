@@ -108,7 +108,7 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
                         rtf.sl = Some(360);
                         state = State::NewLineMargin;
                     },
-                    PclCommand::VerticalCursorPositioning(Right(x)) if x >= 0 => {
+                    PclCommand::VerticalCursorPositioning(Right(x)) => {
                         state = State::PageEnd;
                     },
                     _ => {
