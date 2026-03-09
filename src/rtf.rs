@@ -20,7 +20,7 @@ impl Display for Rtf {
         writeln!(f, "}}")?;
         writeln!(f, "\\paperw11906\\paperh16838")?;
         writeln!(f, "\\margl{}\\margr0\\margt{}\\margb0", self.left_margin, self.top_margin)?;
-        writeln!(f, "\\f0\\fs22")?;
+        writeln!(f, "\\f0\\fs23")?;
         for (is_last_line, line) in self.lines.iter().identify_last() {
             write!(f, "{{\\pard")?;
             if !is_last_line {
@@ -28,7 +28,12 @@ impl Display for Rtf {
             }
             write!(f, " ")?;
             for c in line.chars() {
-                if c.is_ascii() {
+                if c == ' ' {
+                    write!(f, "\\~")?;
+                } else if c.is_ascii() {
+                    if c == '\\' || c == '{' || c == '}' {
+                        write!(f, "\\")?;
+                    }
                     write!(f, "{c}")?;
                 } else {
                     write!(f, "\\u{}?", u32::from(c) as i32)?;
