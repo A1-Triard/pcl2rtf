@@ -31,5 +31,8 @@ fn main() {
         pcl: parse_pcl(&mut stdin)
     };
     let res = pcl_to_rtf(&mut commands);
-    println!("{res:?}");
+    match res {
+        Err(e) => println!("{e:?}"),
+        Ok(rtf) => print!("{rtf}"),
+    }
 }

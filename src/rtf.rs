@@ -1,6 +1,8 @@
 use crate::pcl::PclCommand;
 use crate::ru::ru_char;
 use either::{Left, Right};
+use iter_identify_first_last::IteratorIdentifyFirstLastExt;
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug)]
 pub struct Rtf {
@@ -8,6 +10,35 @@ pub struct Rtf {
     left_margin: u32,
     top_margin: u32,
     sl: Option<u16>,
+}
+
+impl Display for Rtf {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        writeln!(f, "{{\\rtf1\\deff0")?;
+        writeln!(f, "{{\\fonttbl")?;
+        writeln!(f, "{{\\f0\\fswiss\\fcharset0 DotMatrix;}}")?;
+        writeln!(f, "}}")?;
+        writeln!(f, "\\paperw11906\\paperh16838")?;
+        writeln!(f, "\\margl{}\\margr0\\margt{}\\margb0", self.left_margin, self.top_margin)?;
+        writeln!(f, "\\f0\\fs22")?;
+        for (is_last_line, line) in self.lines.iter().identify_last() {
+            write!(f, "{{\\pard")?;
+            if !is_last_line {
+                write!(f, "\\sa{}", self.sl.unwrap_or(240))?;
+            }
+            write!(f, " ")?;
+            for c in line.chars() {
+                if c.is_ascii() {
+                    write!(f, "{c}")?;
+                } else {
+                    write!(f, "\\u{}?", u32::from(c) as i32)?;
+                }
+            }
+            writeln!(f, "\\par}}")?;
+        }
+        writeln!(f, "}}")?;
+        Ok(())
+    }
 }
 
 #[derive(Debug)]

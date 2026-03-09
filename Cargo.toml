@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 either = { version = "1.15.0", default-features = false }
+iter-identify_first_last = { version = "0.2.3", default-features = false }
