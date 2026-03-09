@@ -1,6 +1,7 @@
 use crate::pcl::PclCommand;
 use either::{Left, Right};
 
+#[derive(Debug)]
 pub struct Rtf {
     lines: Vec<String>,
     left_margin: u32,

@@ -21,7 +21,7 @@ pub enum PclCommand {
     HorizontalCursorPositioning(Either<u16, i16>),
 }
 
-struct PclParser<'a> {
+pub struct PclParser<'a> {
     bytes: &'a mut dyn Iterator<Item=u8>,
     read: u32,
     command_start: u32,
@@ -212,20 +212,21 @@ impl<'a> PclParser<'a> {
 }
 
 impl<'a> Iterator for PclParser<'a> {
-    type Item = Result<PclCommand, PclParserError>;
+    type Item = Result<(PclCommand, u32), PclParserError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let c = match self.read_first_byte()? {
             Ok(c) => c,
             Err(e) => return Some(Err(e)),
         };
-        if c != 0x1b { return Some(Ok(PclCommand::Char(c))); }
-        Some(self.parse())
+        if c != 0x1b { return Some(Ok((PclCommand::Char(c), self.command_start))); }
+        match self.parse() {
+            Err(e) => Some(Err(e)),
+            Ok(command) => Some(Ok((command, self.command_start))),
+        }
     }
 }
 
-pub fn parse_pcl(
-    bytes: &mut dyn Iterator<Item=u8>
-) -> impl Iterator<Item=Result<PclCommand, PclParserError>> + '_ {
+pub fn parse_pcl(bytes: &mut dyn Iterator<Item=u8>) -> PclParser<'_> {
     PclParser { bytes, command_start: 0, read: 0 }
 }
