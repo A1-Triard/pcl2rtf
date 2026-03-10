@@ -96,6 +96,7 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
                     PclCommand::VerticalCursorPositioning(Left(0)) => { },
                     PclCommand::Char(13) => { },
                     PclCommand::Char(14) => { },
+                    PclCommand::Char(15) => { },
                     PclCommand::VerticalCursorPositioning(Right(x)) if x >= 0 => {
                         rtf.pages.push(Page {
                             top_margin: u32::try_from(x).unwrap() * 24 / 5,
@@ -150,8 +151,8 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
             State::LineEnd => {
                 let (command, offset) = pcl.next().ok_or(PclToRtfError::UnexpectedEnd)?;
                 match command {
-                    PclCommand::VerticalCursorPositioning(Right(x)) if x >= 48 => {
-                        let space_after = (u32::try_from(x).unwrap() - 48) * 24 / 5; // magic & science
+                    PclCommand::VerticalCursorPositioning(Right(x)) if x >= 48 => { // 48 > 230 * 5 / 24
+                        let space_after = u32::try_from(x).unwrap() * 24 / 5 - 230; // 230 == 11.5 * 1440 / 72
                         rtf.pages.last_mut().unwrap().lines.last_mut().unwrap().space_after = space_after;
                         state = State::LineStart(true);
                     },
