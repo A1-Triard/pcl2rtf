@@ -1,5 +1,5 @@
 use crate::pcl::PclCommand;
-use crate::ru::ru_char;
+use crate::font::{Font, font_char};
 use either::{Left, Right};
 use iter_identify_first_last::IteratorIdentifyFirstLastExt;
 use std::fmt::{self, Display, Formatter};
@@ -82,6 +82,8 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
     enum State { PageStart, LineStart(bool), Text, LineEnd }
     let mut rtf = Rtf { pages: Vec::new() };
     let mut state = State::PageStart;
+    let mut font = Font::X9500;
+    let mut use_font = false;
     loop {
         match state {
             State::PageStart => {
@@ -92,11 +94,12 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
                     PclCommand::VerticalMotionIndex(_) => { },
                     PclCommand::RasterGraphicsPresentationMode(_) => { },
                     PclCommand::EndOfLineWrap(_) => { },
-                    PclCommand::SecondarySymbolSet(9500, 88) => { },
+                    PclCommand::SecondarySymbolSet(9500, b'X') => font = Font::X9500,
+                    PclCommand::SecondarySymbolSet(9508, b'X') => font = Font::X9508,
                     PclCommand::VerticalCursorPositioning(Left(0)) => { },
                     PclCommand::Char(13) => { },
-                    PclCommand::Char(14) => { },
-                    PclCommand::Char(15) => { },
+                    PclCommand::Char(14) => use_font = true,
+                    PclCommand::Char(15) => use_font = false,
                     PclCommand::VerticalCursorPositioning(Right(x)) if x >= 0 => {
                         rtf.pages.push(Page {
                             top_margin: u32::try_from(x).unwrap() * 24 / 5,
@@ -110,6 +113,10 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
             State::LineStart(allow_line_start) => {
                 let (command, offset) = pcl.next().ok_or(PclToRtfError::UnexpectedEnd)?;
                 match command {
+                    PclCommand::SecondarySymbolSet(9500, b'X') => font = Font::X9500,
+                    PclCommand::SecondarySymbolSet(9508, b'X') => font = Font::X9508,
+                    PclCommand::Char(14) => use_font = true,
+                    PclCommand::Char(15) => use_font = false,
                     PclCommand::HorizontalCursorPositioning(Right(x)) if x >= 0 => {
                         if !allow_line_start {
                             return Err(PclToRtfError::UnexpectedCommand(offset));
@@ -130,8 +137,12 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
             State::Text => {
                 let (command, offset) = pcl.next().ok_or(PclToRtfError::UnexpectedEnd)?;
                 match command {
+                    PclCommand::SecondarySymbolSet(9500, b'X') => font = Font::X9500,
+                    PclCommand::SecondarySymbolSet(9508, b'X') => font = Font::X9508,
+                    PclCommand::Char(14) => use_font = true,
+                    PclCommand::Char(15) => use_font = false,
                     PclCommand::Char(c) if c >= b' ' => {
-                        let c = ru_char(c);
+                        let c = font_char(c, if use_font { Some(font) } else { None });
                         rtf.pages.last_mut().unwrap().lines.last_mut().unwrap().text.push(c);
                     },
                     PclCommand::HorizontalCursorPositioning(Right(x)) if x != 0 && x % 30 == 0 => {
@@ -151,6 +162,10 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
             State::LineEnd => {
                 let (command, offset) = pcl.next().ok_or(PclToRtfError::UnexpectedEnd)?;
                 match command {
+                    PclCommand::SecondarySymbolSet(9500, b'X') => font = Font::X9500,
+                    PclCommand::SecondarySymbolSet(9508, b'X') => font = Font::X9508,
+                    PclCommand::Char(14) => use_font = true,
+                    PclCommand::Char(15) => use_font = false,
                     PclCommand::VerticalCursorPositioning(Right(x)) if x >= 48 => { // 48 > 230 * 5 / 24
                         let space_after = u32::try_from(x).unwrap() * 24 / 5 - 230; // 230 == 11.5 * 1440 / 72
                         rtf.pages.last_mut().unwrap().lines.last_mut().unwrap().space_after = space_after;

@@ -6,7 +6,7 @@ use pcl::*;
 mod rtf;
 use rtf::*;
 
-mod ru;
+mod font;
 
 use itertools::Itertools;
 use std::io::{Read, stdin};
