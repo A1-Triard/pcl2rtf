@@ -4,10 +4,40 @@ use either::{Left, Right};
 use iter_identify_first_last::IteratorIdentifyFirstLastExt;
 use std::fmt::{self, Display, Formatter};
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+enum Style {
+    Regular,
+    Italic,
+    Bold,
+    ItalicBold,
+}
+
+impl Style {
+    fn enable(self, underline: bool, f: &mut Formatter<'_>) -> Result<bool, fmt::Error> {
+        match (self, underline) {
+            (Style::Regular, false) => Ok(false),
+            (Style::Italic, false) => { write!(f, "{{\\i ")?; Ok(true) },
+            (Style::Bold, false) => { write!(f, "{{\\b ")?; Ok(true) },
+            (Style::ItalicBold, false) => { write!(f, "{{\\i\\b ")?; Ok(true) },
+            (Style::Regular, true) => { write!(f, "{{\\ul ")?; Ok(true) },
+            (Style::Italic, true) => { write!(f, "{{\\ul\\i ")?; Ok(true) },
+            (Style::Bold, true) => { write!(f, "{{\\ul\\b ")?; Ok(true) },
+            (Style::ItalicBold, true) => { write!(f, "{{\\ul\\i\\b ")?; Ok(true) },
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Span {
+    text: String,
+    style: Style,
+    underline: bool,
+}
+
 #[derive(Debug)]
 struct Line {
     indent: u32,
-    text: String,
+    spans: Vec<Span>,
     space_after: u32,
 }
 
@@ -43,16 +73,22 @@ impl Display for Rtf {
                 }
                 write!(f, "\\li{}", line.indent)?;
                 write!(f, " ")?;
-                for c in line.text.chars() {
-                    if c == ' ' {
-                        write!(f, "\\~")?;
-                    } else if c.is_ascii() {
-                        if c == '\\' || c == '{' || c == '}' {
-                            write!(f, "\\")?;
+                for span in &line.spans {
+                    let group = span.style.enable(span.underline, f)?;
+                    for c in span.text.chars() {
+                        if c == ' ' {
+                            write!(f, "\\~")?;
+                        } else if c.is_ascii() {
+                            if c == '\\' || c == '{' || c == '}' {
+                                write!(f, "\\")?;
+                            }
+                            write!(f, "{c}")?;
+                        } else {
+                            write!(f, "\\u{}?", u32::from(c) as i32)?;
                         }
-                        write!(f, "{c}")?;
-                    } else {
-                        write!(f, "\\u{}?", u32::from(c) as i32)?;
+                    }
+                    if group {
+                        write!(f, "}}")?;
                     }
                 }
                 writeln!(f, "\\par}}")?;
@@ -84,6 +120,8 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
     let mut state = State::PageStart;
     let mut font = Font::X9500;
     let mut use_font = false;
+    let mut style = Style::Regular;
+    let mut underline = false;
     loop {
         match state {
             State::PageStart => {
@@ -94,8 +132,28 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
                     PclCommand::VerticalMotionIndex(_) => { },
                     PclCommand::RasterGraphicsPresentationMode(_) => { },
                     PclCommand::EndOfLineWrap(_) => { },
-                    PclCommand::SecondarySymbolSet(9500, b'X') => font = Font::X9500,
-                    PclCommand::SecondarySymbolSet(9508, b'X') => font = Font::X9508,
+                    PclCommand::SecondarySymbolSet(9500, b'X') => {
+                        font = Font::X9500;
+                        style = Style::Regular;
+                    },
+                    PclCommand::SecondarySymbolSet(9508, b'X') => {
+                        font = Font::X9508;
+                        style = Style::Regular;
+                    },
+                    PclCommand::SecondarySymbolSet(9501, b'X') => {
+                        font = Font::X9500;
+                        style = Style::Italic;
+                    },
+                    PclCommand::SecondarySymbolSet(9502, b'X') => {
+                        font = Font::X9500;
+                        style = Style::Bold;
+                    },
+                    PclCommand::SecondarySymbolSet(9503, b'X') => {
+                        font = Font::X9500;
+                        style = Style::ItalicBold;
+                    },
+                    PclCommand::EnableUnderline => underline = true,
+                    PclCommand::DisableUnderline => underline = false,
                     PclCommand::VerticalCursorPositioning(Left(0)) => { },
                     PclCommand::Char(13) => { },
                     PclCommand::Char(14) => use_font = true,
@@ -113,8 +171,28 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
             State::LineStart(allow_line_start) => {
                 let (command, offset) = pcl.next().ok_or(PclToRtfError::UnexpectedEnd)?;
                 match command {
-                    PclCommand::SecondarySymbolSet(9500, b'X') => font = Font::X9500,
-                    PclCommand::SecondarySymbolSet(9508, b'X') => font = Font::X9508,
+                    PclCommand::SecondarySymbolSet(9500, b'X') => {
+                        font = Font::X9500;
+                        style = Style::Regular;
+                    },
+                    PclCommand::SecondarySymbolSet(9508, b'X') => {
+                        font = Font::X9508;
+                        style = Style::Regular;
+                    },
+                    PclCommand::SecondarySymbolSet(9501, b'X') => {
+                        font = Font::X9500;
+                        style = Style::Italic;
+                    },
+                    PclCommand::SecondarySymbolSet(9502, b'X') => {
+                        font = Font::X9500;
+                        style = Style::Bold;
+                    },
+                    PclCommand::SecondarySymbolSet(9503, b'X') => {
+                        font = Font::X9500;
+                        style = Style::ItalicBold;
+                    },
+                    PclCommand::EnableUnderline => underline = true,
+                    PclCommand::DisableUnderline => underline = false,
                     PclCommand::Char(14) => use_font = true,
                     PclCommand::Char(15) => use_font = false,
                     PclCommand::HorizontalCursorPositioning(Right(x)) if x >= 0 => {
@@ -123,7 +201,7 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
                         }
                         rtf.pages.last_mut().unwrap().lines.push(Line {
                             indent: u32::try_from(x).unwrap() * 24 / 5,
-                            text: String::new(),
+                            spans: Vec::new(),
                             space_after: 0,
                         });
                         state = State::Text;
@@ -137,17 +215,63 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
             State::Text => {
                 let (command, offset) = pcl.next().ok_or(PclToRtfError::UnexpectedEnd)?;
                 match command {
-                    PclCommand::SecondarySymbolSet(9500, b'X') => font = Font::X9500,
-                    PclCommand::SecondarySymbolSet(9508, b'X') => font = Font::X9508,
+                    PclCommand::SecondarySymbolSet(9500, b'X') => {
+                        font = Font::X9500;
+                        style = Style::Regular;
+                    },
+                    PclCommand::SecondarySymbolSet(9508, b'X') => {
+                        font = Font::X9508;
+                        style = Style::Regular;
+                    },
+                    PclCommand::SecondarySymbolSet(9501, b'X') => {
+                        font = Font::X9500;
+                        style = Style::Italic;
+                    },
+                    PclCommand::SecondarySymbolSet(9502, b'X') => {
+                        font = Font::X9500;
+                        style = Style::Bold;
+                    },
+                    PclCommand::SecondarySymbolSet(9503, b'X') => {
+                        font = Font::X9500;
+                        style = Style::ItalicBold;
+                    },
+                    PclCommand::EnableUnderline => underline = true,
+                    PclCommand::DisableUnderline => underline = false,
                     PclCommand::Char(14) => use_font = true,
                     PclCommand::Char(15) => use_font = false,
                     PclCommand::Char(c) if c >= b' ' => {
                         let c = font_char(c, if use_font { Some(font) } else { None });
-                        rtf.pages.last_mut().unwrap().lines.last_mut().unwrap().text.push(c);
+                        let cur_style = rtf.pages.last().unwrap()
+                            .lines.last().unwrap()
+                            .spans.last().map(|x| (x.style, x.underline));
+                        if cur_style != Some((style, underline)) {
+                            rtf.pages.last_mut().unwrap().lines.last_mut().unwrap().spans.push(Span {
+                                text: String::new(),
+                                style,
+                                underline,
+                            });
+                        }
+                        rtf.pages.last_mut().unwrap()
+                            .lines.last_mut().unwrap()
+                            .spans.last_mut().unwrap()
+                            .text.push(c);
                     },
                     PclCommand::HorizontalCursorPositioning(Right(x)) if x != 0 && x % 30 == 0 => {
+                        let cur_style = rtf.pages.last().unwrap()
+                            .lines.last().unwrap()
+                            .spans.last().map(|x| (x.style, x.underline));
+                        if cur_style != Some((style, underline)) {
+                            rtf.pages.last_mut().unwrap().lines.last_mut().unwrap().spans.push(Span {
+                                text: String::new(),
+                                style,
+                                underline,
+                            });
+                        }
                         for _ in 0 .. x / 30 {
-                            rtf.pages.last_mut().unwrap().lines.last_mut().unwrap().text.push(' ');
+                            rtf.pages.last_mut().unwrap()
+                                .lines.last_mut().unwrap()
+                                .spans.last_mut().unwrap()
+                                .text.push(' ');
                         }
                     },
                     PclCommand::Char(13) => {
@@ -162,8 +286,28 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
             State::LineEnd => {
                 let (command, offset) = pcl.next().ok_or(PclToRtfError::UnexpectedEnd)?;
                 match command {
-                    PclCommand::SecondarySymbolSet(9500, b'X') => font = Font::X9500,
-                    PclCommand::SecondarySymbolSet(9508, b'X') => font = Font::X9508,
+                    PclCommand::SecondarySymbolSet(9500, b'X') => {
+                        font = Font::X9500;
+                        style = Style::Regular;
+                    },
+                    PclCommand::SecondarySymbolSet(9508, b'X') => {
+                        font = Font::X9508;
+                        style = Style::Regular;
+                    },
+                    PclCommand::SecondarySymbolSet(9501, b'X') => {
+                        font = Font::X9500;
+                        style = Style::Italic;
+                    },
+                    PclCommand::SecondarySymbolSet(9502, b'X') => {
+                        font = Font::X9500;
+                        style = Style::Bold;
+                    },
+                    PclCommand::SecondarySymbolSet(9503, b'X') => {
+                        font = Font::X9500;
+                        style = Style::ItalicBold;
+                    },
+                    PclCommand::EnableUnderline => underline = true,
+                    PclCommand::DisableUnderline => underline = false,
                     PclCommand::Char(14) => use_font = true,
                     PclCommand::Char(15) => use_font = false,
                     PclCommand::VerticalCursorPositioning(Right(x)) if x >= 48 => { // 48 > 230 * 5 / 24

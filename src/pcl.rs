@@ -31,6 +31,8 @@ pub enum PclCommand {
     SecondarySymbolSet(u16, u8),
     VerticalCursorPositioning(Either<u16, i16>),
     HorizontalCursorPositioning(Either<u16, i16>),
+    EnableUnderline,
+    DisableUnderline,
 }
 
 pub struct PclParser<'a> {
@@ -167,6 +169,14 @@ impl<'a> PclParser<'a> {
         }
     }
     
+    fn parse_amp_d(&mut self) -> Result<PclCommand, PclParserError> {
+        match self.read_byte()? {
+            b'D' => Ok(PclCommand::EnableUnderline),
+            b'@' => Ok(PclCommand::DisableUnderline),
+            _ => Err(PclParserError::UnknownCommand(self.command_start)),
+        }
+    }
+
     fn parse_star_r(&mut self) -> Result<PclCommand, PclParserError> {
         let (n, c) = self.read_u8()?;
         match c {
@@ -194,6 +204,7 @@ impl<'a> PclParser<'a> {
             b'k' => self.parse_amp_k(),
             b'l' => self.parse_amp_l(),
             b's' => self.parse_amp_s(),
+            b'd' => self.parse_amp_d(),
             _ => Err(PclParserError::UnknownCommand(self.command_start)),
         }
     }
