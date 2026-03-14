@@ -162,6 +162,13 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
                         font = Font::X9500;
                         style = Style::Regular;
                     },
+                    PclCommand::SecondarySymbolSet(9507, b'X') => {
+                        if style == Style::Subscript || style == Style::Superscript {
+                            return Err(PclToRtfError::UnexpectedCommand(offset));
+                        }
+                        font = Font::X9507;
+                        style = Style::Regular;
+                    },
                     PclCommand::SecondarySymbolSet(9508, b'X') => {
                         if style == Style::Subscript || style == Style::Superscript {
                             return Err(PclToRtfError::UnexpectedCommand(offset));
@@ -233,6 +240,13 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
                             return Err(PclToRtfError::UnexpectedCommand(offset));
                         }
                         font = Font::X9500;
+                        style = Style::Regular;
+                    },
+                    PclCommand::SecondarySymbolSet(9507, b'X') => {
+                        if style == Style::Subscript || style == Style::Superscript {
+                            return Err(PclToRtfError::UnexpectedCommand(offset));
+                        }
+                        font = Font::X9507;
                         style = Style::Regular;
                     },
                     PclCommand::SecondarySymbolSet(9508, b'X') => {
@@ -311,6 +325,13 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
                             return Err(PclToRtfError::UnexpectedCommand(offset));
                         }
                         font = Font::X9500;
+                        style = Style::Regular;
+                    },
+                    PclCommand::SecondarySymbolSet(9507, b'X') => {
+                        if style == Style::Subscript || style == Style::Superscript {
+                            return Err(PclToRtfError::UnexpectedCommand(offset));
+                        }
+                        font = Font::X9507;
                         style = Style::Regular;
                     },
                     PclCommand::SecondarySymbolSet(9508, b'X') => {
@@ -434,6 +455,13 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
                         font = Font::X9500;
                         style = Style::Regular;
                     },
+                    PclCommand::SecondarySymbolSet(9507, b'X') => {
+                        if style == Style::Subscript || style == Style::Superscript {
+                            return Err(PclToRtfError::UnexpectedCommand(offset));
+                        }
+                        font = Font::X9507;
+                        style = Style::Regular;
+                    },
                     PclCommand::SecondarySymbolSet(9508, b'X') => {
                         if style == Style::Subscript || style == Style::Superscript {
                             return Err(PclToRtfError::UnexpectedCommand(offset));
@@ -510,6 +538,11 @@ pub fn pcl_to_rtf(pcl: &mut dyn Iterator<Item=(PclCommand, u32)>) -> Result<Rtf,
                     PclCommand::Char(14) => use_font = true,
                     PclCommand::Char(15) => use_font = false,
                     PclCommand::SecondarySymbolSet(9500, b'X') => {
+                        style = Style::Regular;
+                        state = prev_state.into();
+                    },
+                    PclCommand::SecondarySymbolSet(9507, b'X') => {
+                        font = Font::X9507;
                         style = Style::Regular;
                         state = prev_state.into();
                     },
